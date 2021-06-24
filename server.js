@@ -9,7 +9,7 @@ var mysql = require('mysql');
 const got = require('got');
 var axios = require('axios');
 let httpsProxyAgent = require('https-proxy-agent');
-var agent = new httpsProxyAgent(process.env.PROXY);
+// var agent = new httpsProxyAgent(process.env.PROXY);
 // var agent = new httpsProxyAgent('http://myspambox280:Y7u7TfI@176.103.50.237:65233');
 const randomUseragent = require('random-useragent')
 
