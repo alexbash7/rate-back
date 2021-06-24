@@ -97,7 +97,7 @@ app.post('/getNextImages', function (req, res) {
     if(req.body.refId!=0){
         dbConn.query(`
             SELECT
-                author_id AS authorId, id
+                user_id AS authorId, id
             FROM ${table}
             WHERE id > ? AND s3_address <> '0'
             ORDER BY id
@@ -113,7 +113,7 @@ app.post('/getNextImages', function (req, res) {
     else{
         dbConn.query(`
             SELECT
-                author_id AS authorId, id
+                user_id AS authorId, id
             FROM ${table}
             WHERE id > 0 AND s3_address <> '0'
             ORDER BY date
@@ -131,7 +131,7 @@ app.post('/getNextImages', function (req, res) {
 app.post('/getPrevImages', function (req, res) {
     dbConn.query(`
         SELECT
-            author_id AS authorId, id
+            user_id AS authorId, id
         FROM ${table}
         WHERE id < ? AND s3_address <> '0'
         ORDER BY id DESC
@@ -195,13 +195,13 @@ function processAuthorResponse(res, error, results) {
 
 app.post('/rateImages', function (req, res) {
     dbConn.query(
-        `SELECT * FROM ${table} WHERE author_id = ?`,
+        `SELECT * FROM ${table} WHERE user_id = ?`,
        req.body.authorId,
        function(error, results){
         if(!error){
             if(result = []){
                 dbConn.query(
-                    `UPDATE ${table} SET score = ?, date = now() WHERE author_id = ?`,
+                    `UPDATE ${table} SET score = ?, date = now() WHERE user_id = ?`,
                     [req.body.score, req.body.authorId],
                     function (error, results, fields) {
                         // if (error) throw error;
@@ -213,7 +213,7 @@ app.post('/rateImages', function (req, res) {
             }
             else{
                 dbConn.query(
-                    `UPDATE ${table} SET score = ?, date = now() WHERE author_id = ?`,
+                    `UPDATE ${table} SET score = ?, date = now() WHERE user_id = ?`,
                     [req.body.score, req.body.authorId],
                     function (error, results, fields) {
                         if (error) throw error;
