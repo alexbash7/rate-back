@@ -11,6 +11,7 @@ var axios = require('axios');
 // let httpsProxyAgent = require('https-proxy-agent');
 // var agent = new httpsProxyAgent('http://myspambox280:Y7u7TfI@176.103.50.237:65233');
 const randomUseragent = require('random-useragent');
+const promClient = require('prom-client');
 
 app.enable('trust proxy');
 
@@ -43,6 +44,58 @@ instance.interceptors.response.use((response) => {
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     next();
 });*/
+
+
+const register = new promClient.Registry();
+register.setDefaultLabels({app: 'rate-back'});
+
+const metrics = {
+    showProfiles: new promClient.Counter({
+        name: 'show_profile_counter',
+        help: 'Profile show counter'
+    }),
+    rateButton: new promClient.Counter({
+        name: 'rate_button_counter',
+        help: 'Rate button press counter'
+    }),
+    pauseButton: new promClient.Counter({
+        name: 'pause_button_counter',
+        help: 'Pause button press counter'
+    }),
+    backButton: new promClient.Counter({
+        name: 'back_button_counter',
+        help: 'Back button press counter'
+    }),
+    rateButtonGauge: new promClient.Gauge({
+        name: 'rate_button_gauge',
+        help: 'Rate button press gauge'
+    }),
+    pauseButtonGauge: new promClient.Gauge({
+        name: 'pause_button_gauge',
+        help: 'Pause button press gauge'
+    }),
+    backButtonGauge: new promClient.Gauge({
+        name: 'back_button_gauge',
+        help: 'Back button press gauge'
+    })
+};
+
+let rateCounter = 0;
+let pauseCounter = 0;
+let backCounter = 0;
+
+function incrShowProfileCounter() {
+    metrics.showProfiles.inc();
+
+    if (metrics.showProfiles.hashMap[''].value % 1000 === 0) {
+        metrics.rateButtonGauge.set(pauseCounter/1000);
+        metrics.pauseButtonGauge.set(pauseCounter/1000);
+        metrics.backButtonGauge.set(pauseCounter/1000);
+        rateCounter = 0;
+        pauseCounter = 0;
+        backCounter = 0;
+    }
+}
 
 app.use(cors());
 
@@ -80,7 +133,7 @@ function handleDisconnect() {
         }
     });
 }
-  
+
 handleDisconnect();
 
 setInterval(function () {
@@ -126,6 +179,7 @@ app.post('/getNextImages', function (req, res) {
             }
         );
     }
+    incrShowProfileCounter();
 });
 
 app.post('/getPrevImages', function (req, res) {
@@ -142,6 +196,7 @@ app.post('/getPrevImages', function (req, res) {
             processAuthorResponse(res, error, results);
         }
     );
+    metrics.backButton.inc();
 });
 
 function processAuthorResponse(res, error, results) {
@@ -149,14 +204,14 @@ function processAuthorResponse(res, error, results) {
 
     if (results.length == 0)
         return res.send({ data: [] });
-    
+
     var authorId = results[0].authorId;
     var dbId = results[0].id;
     var totalDone = 1;
 
     // if (td % 100 == 0) {
 
-        dbConn.query(`
+    dbConn.query(`
         SELECT COUNT(*) AS count
         FROM ${table}
         WHERE id < ?
@@ -168,26 +223,26 @@ function processAuthorResponse(res, error, results) {
             // console.log(totalDone);
             console.log('GotTotalDone', dayjs().format('mm:ss:SSS'))
         }
-     );
+    );
 
     // }
 
 
-        // console.log(dbId)
-        console.log('GotImagesFromDB', dayjs().format('mm:ss:SSS'))
-        var posts = [];
+    // console.log(dbId)
+    console.log('GotImagesFromDB', dayjs().format('mm:ss:SSS'))
+    var posts = [];
 
-        for(var i = 0 ; i < 12; i ++){
-            posts.push({
-                totalDone: totalDone,
-                dbId: dbId,
-                authorId: authorId,
-                // postId: results[i].id,
-                url: `https://s3.eu-central-1.wasabisys.com/instaloader/${authorId}_${i}.jpg`,
-                // url: 'https://cdn3.iconfinder.com/data/icons/diagram_v2/PNG/96x96/diagram_v2-12.png',
-            });
-        }
-        return res.send({data:posts})
+    for(var i = 0 ; i < 12; i ++){
+        posts.push({
+            totalDone: totalDone,
+            dbId: dbId,
+            authorId: authorId,
+            // postId: results[i].id,
+            url: `https://s3.eu-central-1.wasabisys.com/instaloader/${authorId}_${i}.jpg`,
+            // url: 'https://cdn3.iconfinder.com/data/icons/diagram_v2/PNG/96x96/diagram_v2-12.png',
+        });
+    }
+    return res.send({data:posts})
 
 
 
@@ -196,38 +251,50 @@ function processAuthorResponse(res, error, results) {
 app.post('/rateImages', function (req, res) {
     dbConn.query(
         `SELECT * FROM ${table} WHERE user_id = ?`,
-       req.body.authorId,
-       function(error, results){
-        if(!error){
-            if(result = []){
-                dbConn.query(
-                    `UPDATE ${table} SET score = ?, date = now() WHERE user_id = ?`,
-                    [req.body.score, req.body.authorId],
-                    function (error, results, fields) {
-                        // if (error) throw error;
-                        console.log("here")
-                        console.log(req.body.authorId)
-                        return res.send(true);
-                    }
-                );
+        req.body.authorId,
+        function(error, results){
+            if(!error){
+                if(result = []){
+                    dbConn.query(
+                        `UPDATE ${table} SET score = ?, date = now() WHERE user_id = ?`,
+                        [req.body.score, req.body.authorId],
+                        function (error, results, fields) {
+                            // if (error) throw error;
+                            console.log("here")
+                            console.log(req.body.authorId)
+                            return res.send(true);
+                        }
+                    );
+                }
+                else{
+                    dbConn.query(
+                        `UPDATE ${table} SET score = ?, date = now() WHERE user_id = ?`,
+                        [req.body.score, req.body.authorId],
+                        function (error, results, fields) {
+                            if (error) throw error;
+                            console.log('done')
+                            return res.send(true);
+                        }
+                    );
+                }
+
             }
-            else{
-                dbConn.query(
-                    `UPDATE ${table} SET score = ?, date = now() WHERE user_id = ?`,
-                    [req.body.score, req.body.authorId],
-                    function (error, results, fields) {
-                        if (error) throw error;
-                        console.log('done')
-                        return res.send(true);
-                    }
-                );
-            }
-            
-        }
         }
     )
+    metrics.rateButton.inc();
 });
 
+// Pause button  endpoint
+app.get('/pauseImages', (req, res) => {
+    metrics.pauseButton.inc();
+    res.send(true);
+});
+
+// Prometheus endpoint
+app.get('/metrics', async (req, res) => {
+    res.set('Content-Type', promClient.register.contentType);
+    res.send(await promClient.register.metrics());
+});
 
 // set port
 const port = process.env.PORT || 8080;
