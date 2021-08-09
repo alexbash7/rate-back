@@ -285,10 +285,11 @@ app.post('/rateImages', function (req, res) {
 });
 
 // Pause button  endpoint
-app.get('/pauseImages', (req, res) => {
+app.post('/pauseImages', (req, res) => {
     metrics.pauseButton.inc();
     res.send(true);
 });
+
 
 // Prometheus endpoint
 app.get('/metrics', async (req, res) => {
